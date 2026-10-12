@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modular Edge Chat Widget — Zero-Cost Serverless Demo</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Marked.js for markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for chat history */
+        .chat-scroll::-webkit-scrollbar { width: 6px; }
+        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+        .chat-scroll::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.6); }
+        /* Pulse dot animation */
+        @keyframes subtlePulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.08); opacity: 1; }
+        }
+        .pulse-subtle { animation: subtlePulse 2.5s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200">
+
+<header class="w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold shadow-md shadow-brand-500/20">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+                <span class="font-bold text-lg tracking-tight">ZeroCost<span class="text-brand-600">Bot</span></span>
+                <span class="hidden sm:inline-block ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">₹0 / Serverless</span>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button id="open-settings-header-btn" class="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center space-x-1.5">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>API Settings</span>
+            </button>
+            <!-- Dark Mode Toggle Button -->
+            <button id="theme-toggle" class="p-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Toggle Theme">
+                <svg id="sun-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg id="moon-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+            </button>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 flex-grow">
+    <div class="text-center max-w-3xl mx-auto space-y-4">
+        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 text-xs font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span>Static Site + Client-Side Model Execution = 100% Free Hosting</span>
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight">
+            Enterprise Chatbot Architecture on a <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-400">Zero-Rupee</span> Budget
+        </h1>
+        <p class="text-slate-600 dark:text-slate-400 text-base sm:text-lg">
+            Deploy this lightweight widget on GitHub Pages, Netlify, or Vercel. Connects directly to ultra-fast free tier LLMs (Groq, Llama 3.2 1B/3B) with zero server fees, zero backend maintenance, and instant streaming.
+        </p>
+        <div class="flex flex-wrap justify-center gap-3 pt-4">
+            <button onclick="toggleChatWindow(true)" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-lg shadow-brand-500/25 transition flex items-center space-x-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <span>Launch Interactive Widget</span>
+            </button>
+            <button onclick="document.getElementById('embed-code-section').scrollIntoView({ behavior: 'smooth' })" class="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-sm transition">
+                Get Embed Code
+            </button>
+        </div>
+    </div>
+
+    <!-- Feature Pillar Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
+        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center font-bold mb-4">
+                ₹0
+            </div>
+            <h3 class="font-bold text-lg mb-2">Zero Infrastructure Cost</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+                Static HTML/JS loaded from free static CDNs (GitHub Pages). Uses free-tier Groq API (30 RPM free on Llama 3.2) or Hugging Face serverless free tier.
+            </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center font-bold mb-4">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            </div>
+            <h3 class="font-bold text-lg mb-2">Modular Persona Adapters</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+                Switch instantly between Customer Support, Technical Coding Specialist, or Sales Inquiries via hot-swapped system personas without spinning up new containers.
+            </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center font-bold mb-4">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <h3 class="font-bold text-lg mb-2">Sub-200ms Token Streaming</h3>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+                Real-time Server-Sent Events (SSE) streaming with live markdown rendering, syntax highlighting, and auto-scrolling directly in the visitor's browser.
+            </p>
+        </div>
+    </div>
+
+    <!-- Embed Code Snippet Container -->
+    <div id="embed-code-section" class="mt-16 p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="font-bold text-lg">Embed in 1 Line of HTML</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Paste into any website footer (WordPress, Shopify, React, HTML).</p>
+            </div>
+            <button onclick="copyEmbedSnippet()" id="copy-snippet-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                Copy Script Tag
+            </button>
+        </div>
+        <pre class="bg-slate-950 text-slate-200 p-4 rounded-xl text-xs sm:text-sm font-mono overflow-x-auto"><code>&lt;!-- Zero-Cost Embeddable Chat Widget --&gt;
+&lt;script src="https://your-domain-or-github-pages.github.io/chat-widget.js" defer&gt;&lt;/script&gt;
+&lt;div id="modular-chat-widget" data-persona="support" data-provider="groq"&gt;&lt;/div&gt;</code></pre>
+    </div>
+</main>
+
+<div id="widget-container" class="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <!-- Chat Launcher Button -->
+    <button id="chat-launcher-btn" onclick="toggleChatWindow()" class="group relative w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-700 text-white shadow-xl shadow-brand-600/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95" aria-label="Toggle chat">
+        <svg id="launcher-chat-icon" class="w-6 h-6 transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        <svg id="launcher-close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+        <!-- Online Indicator Dot -->
+        <span class="absolute top-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full"></span>
+    </button>
+</div>
+
+<div id="chat-window" class="fixed bottom-24 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-[420px] h-[580px] max-h-[80vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 transition-all duration-300 transform scale-95 opacity-0 pointer-events-none origin-bottom-right">
+    
+    <!-- Top Header -->
+    <div class="px-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="relative">
+                <div id="avatar-icon-container" class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs">
+                    AI
+                </div>
+                <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white dark:border-slate-900"></span>
+            </div>
+            <div>
+                <h2 id="widget-header-title" class="text-sm font-bold leading-tight">Customer Assistant</h2>
+                <div class="flex items-center space-x-1.5">
+                    <span id="active-model-tag" class="text-[10px] text-slate-500 dark:text-slate-400">Llama-3.2-1B (Groq)</span>
+                    <span class="text-[10px] px-1 rounded bg-slate-200 dark:bg-slate-700 font-mono text-slate-600 dark:text-slate-300">Fast</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-1">
+            <!-- Persona Switcher Dropdown Button -->
+            <button id="toggle-persona-btn" onclick="togglePersonaMenu()" title="Switch Persona / Module" class="p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            </button>
+            <!-- Settings Modal Button -->
+            <button onclick="toggleSettingsModal(true)" title="API Settings" class="p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </button>
+            <!-- Clear Chat Button -->
+            <button onclick="clearChatHistory()" title="Clear Chat" class="p-1.5 text-slate-500 hover:text-rose-500 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+            <!-- Close Chat Window Button -->
+            <button onclick="toggleChatWindow(false)" class="p-1.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="persona-dropdown" class="hidden px-4 py-3 bg-brand-50 dark:bg-slate-800 border-b border-brand-100 dark:border-slate-700 text-xs transition-all">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-2">Switch Active Modular Persona:</p>
+        <div class="grid grid-cols-3 gap-2">
+            <button onclick="setPersona('support')" class="persona-option-btn p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-left hover:border-brand-500 transition" data-persona="support">
+                <div class="font-bold text-brand-600">Support</div>
+                <div class="text-[10px] text-slate-500">Concise Help</div>
+            </button>
+            <button onclick="setPersona('tech')" class="persona-option-btn p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-left hover:border-brand-500 transition" data-persona="tech">
+                <div class="font-bold text-brand-600">Engineer</div>
+                <div class="text-[10px] text-slate-500">Code & Bugfix</div>
+            </button>
+            <button onclick="setPersona('sales')" class="persona-option-btn p-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-left hover:border-brand-500 transition" data-persona="sales">
+                <div class="font-bold text-brand-600">Sales/Lead</div>
+                <div class="text-[10px] text-slate-500">Pricing & Pitch</div>
+            </button>
+        </div>
+    </div>
+
+    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3.5 chat-scroll bg-slate-50/50 dark:bg-slate-900/50 text-sm">
+        <!-- Initial welcome bot message -->
+        <div class="flex items-start space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                AI
+            </div>
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm max-w-[85%]">
+                <p class="text-xs sm:text-sm text-slate-800 dark:text-slate-200">
+                    Hello! I am your <strong>zero-cost edge assistant</strong>. Ask me any question, test code generation, or change my persona in the header menu.
+                </p>
+                <div class="mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>Ready</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-3 bg-white dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700">
+        <form id="chat-form" onsubmit="handleChatSubmit(event)" class="relative flex items-center">
+            <textarea id="user-input" rows="1" placeholder="Type your message..." class="w-full pl-3 pr-10 py-2.5 text-xs sm:text-sm bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none text-slate-900 dark:text-slate-100 placeholder-slate-400 max-h-28" onkeydown="handleKeyDown(event)"></textarea>
+            <button type="submit" id="send-btn" class="absolute right-1.5 p-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            </button>
+        </form>
+        <div class="flex items-center justify-between mt-2 px-1 text-[10px] text-slate-400">
+            <span id="connection-status-pill" class="flex items-center space-x-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span id="provider-label">Client Simulation / Free Groq Ready</span>
+            </span>
+            <span>Enter to send</span>
+        </div>
+    </div>
+</div>
+
+<div id="settings-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <h3 class="font-bold text-base">API & Inference Settings</h3>
+            <button onclick="toggleSettingsModal(false)" class="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="space-y-3 text-xs sm:text-sm">
+            <div>
+                <label class="block font-medium mb-1">Inference Provider</label>
+                <select id="setting-provider" class="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs sm:text-sm" onchange="handleProviderChange()">
+                    <option value="simulation">Offline Simulation (No key needed - 100% Free)</option>
+                    <option value="groq" selected>Groq Free Cloud (Llama 3.2 1B/3B - Ultra Fast)</option>
+                    <option value="custom">Custom OpenAI-Compatible Endpoint (Local / vLLM)</option>
+                </select>
+            </div>
+
+            <div id="api-key-container">
+                <label class="block font-medium mb-1">API Key <span class="text-slate-400 font-normal">(Stored locally in browser only)</span></label>
+                <input type="password" id="setting-api-key" placeholder="gsk_... or sk-..." class="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs">
+                <p class="text-[11px] text-slate-500 mt-1">Get a free key at <a href="https://console.groq.com" target="_blank" class="text-brand-600 underline">console.groq.com</a> (Free tier requires ₹0).</p>
+            </div>
+
+            <div id="custom-endpoint-container" class="hidden">
+                <label class="block font-medium mb-1">Custom Base URL</label>
+                <input type="text" id="setting-custom-url" placeholder="http://localhost:8000/v1" class="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs">
+            </div>
+
+            <div>
+                <label class="block font-medium mb-1">Model Architecture</label>
+                <select id="setting-model" class="w-full p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs">
+                    <option value="llama-3.2-1b-preview">Llama 3.2 1B (Smallest / Instant latency)</option>
+                    <option value="llama-3.2-3b-preview" selected>Llama 3.2 3B (Balanced Quality & Speed)</option>
+                    <option value="qwen-2.5-coder-32b">Qwen 2.5 Coder 32B (Advanced Technical Tasks)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="pt-3 flex justify-end space-x-2 border-t border-slate-100 dark:border-slate-800">
+            <button onclick="toggleSettingsModal(false)" class="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition">Cancel</button>
+            <button onclick="saveSettings()" class="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold transition">Save & Apply</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast-message" class="fixed top-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs flex items-center space-x-2 transform translate-y-[-100px] opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toast-text">Settings saved</span>
+</div>
+
+<script>
+    // State management
+    const state = {
+        isOpen: false,
+        persona: 'support',
+        provider: localStorage.getItem('zc_provider') || 'groq',
+        apiKey: localStorage.getItem('zc_api_key') || '',
+        customUrl: localStorage.getItem('zc_custom_url') || 'http://localhost:8000/v1',
+        model: localStorage.getItem('zc_model') || 'llama-3.2-3b-preview',
+        history: [],
+        isStreaming: false
+    };
+
+    // System Prompts for persona swapping
+    const PERSONAS = {
+        support: {
+            title: "Customer Support Assistant",
+            shortTag: "Support",
+            systemPrompt: "You are an empathetic, concise Customer Support Agent. Answer directly in 2-3 sentences when possible. Be helpful and professional."
+        },
+        tech: {
+            title: "Technical Systems Engineer",
+            shortTag: "Engineer",
+            systemPrompt: "You are a senior software engineer. Provide exact code solutions, debugging advice, and technical explanations using clean markdown blocks."
+        },
+        sales: {
+            title: "Sales & Product Specialist",
+            shortTag: "Sales",
+            systemPrompt: "You are an enthusiastic sales advisor. Explain product features, demonstrate value propositions, and encourage taking the next step."
+        }
+    };
+
+    // DOM Elements
+    const chatWindow = document.getElementById('chat-window');
+    const chatLauncherBtn = document.getElementById('chat-launcher-btn');
+    const chatIcon = document.getElementById('launcher-chat-icon');
+    const closeIcon = document.getElementById('launcher-close-icon');
+    const messagesContainer = document.getElementById('chat-messages');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const personaDropdown = document.getElementById('persona-dropdown');
+    const settingsModal = document.getElementById('settings-modal');
+    const activeModelTag = document.getElementById('active-model-tag');
+    const widgetHeaderTitle = document.getElementById('widget-header-title');
+
+    const themeToggle = document.getElementById('theme-toggle');
+    const sunIcon = document.getElementById('sun-icon');
+    const moonIcon = document.getElementById('moon-icon');
+
+    function initTheme() {
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            sunIcon.classList.remove('hidden');
+            moonIcon.classList.add('hidden');
+        } else {
+            document.documentElement.classList.remove('dark');
+            sunIcon.classList.add('hidden');
+            moonIcon.classList.remove('hidden');
+        }
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        sunIcon.classList.toggle('hidden', !isDark);
+        moonIcon.classList.toggle('hidden', isDark);
+    });
+
+    function toggleChatWindow(forceState) {
+        state.isOpen = forceState !== undefined ? forceState : !state.isOpen;
+        if (state.isOpen) {
+            chatWindow.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+            chatWindow.classList.add('opacity-100', 'scale-100');
+            chatIcon.classList.add('hidden');
+            closeIcon.classList.remove('hidden');
+            setTimeout(() => userInput.focus(), 200);
+        } else {
+            chatWindow.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+            chatWindow.classList.remove('opacity-100', 'scale-100');
+            chatIcon.classList.remove('hidden');
+            closeIcon.classList.add('hidden');
+            personaDropdown.classList.add('hidden');
+        }
+    }
+
+    function togglePersonaMenu() {
+        personaDropdown.classList.toggle('hidden');
+    }
+
+    function setPersona(key) {
+        if (!PERSONAS[key]) return;
+        state.persona = key;
+        widgetHeaderTitle.innerText = PERSONAS[key].title;
+        updateStatusLabel();
+        personaDropdown.classList.add('hidden');
+        showToast(`Switched persona to: ${PERSONAS[key].title}`);
+    }
+
+    function toggleSettingsModal(open) {
+        settingsModal.classList.toggle('hidden', !open);
+        if (open) {
+            document.getElementById('setting-provider').value = state.provider;
+            document.getElementById('setting-api-key').value = state.apiKey;
+            document.getElementById('setting-custom-url').value = state.customUrl;
+            document.getElementById('setting-model').value = state.model;
+            handleProviderChange();
+        }
+    }
+
+    document.getElementById('open-settings-header-btn').addEventListener('click', () => toggleSettingsModal(true));
+
+    function handleProviderChange() {
+        const prov = document.getElementById('setting-provider').value;
+        const keyContainer = document.getElementById('api-key-container');
+        const customContainer = document.getElementById('custom-endpoint-container');
+        
+        if (prov === 'simulation') {
+            keyContainer.classList.add('hidden');
+            customContainer.classList.add('hidden');
+        } else if (prov === 'custom') {
+            keyContainer.classList.remove('hidden');
+            customContainer.classList.remove('hidden');
+        } else {
+            keyContainer.classList.remove('hidden');
+            customContainer.classList.add('hidden');
+        }
+    }
+
+    function saveSettings() {
+        state.provider = document.getElementById('setting-provider').value;
+        state.apiKey = document.getElementById('setting-api-key').value.trim();
+        state.customUrl = document.getElementById('setting-custom-url').value.trim();
+        state.model = document.getElementById('setting-model').value;
+
+        localStorage.setItem('zc_provider', state.provider);
+        localStorage.setItem('zc_api_key', state.apiKey);
+        localStorage.setItem('zc_custom_url', state.customUrl);
+        localStorage.setItem('zc_model', state.model);
+
+        updateStatusLabel();
+        toggleSettingsModal(false);
+        showToast('Settings saved successfully!');
+    }
+
+    function updateStatusLabel() {
+        const label = document.getElementById('provider-label');
+        if (state.provider === 'simulation') {
+            label.innerText = 'Offline Simulated Engine';
+            activeModelTag.innerText = 'Simulated 1B';
+        } else if (state.provider === 'groq') {
+            label.innerText = state.apiKey ? 'Connected to Groq Cloud' : 'Add Groq Key for Live Model';
+            activeModelTag.innerText = `${state.model}`;
+        } else {
+            label.innerText = 'Connected to Custom Host';
+            activeModelTag.innerText = 'Custom Endpoint';
+        }
+    }
+
+    function showToast(msg) {
+        const toast = document.getElementById('toast-message');
+        const toastText = document.getElementById('toast-text');
+        toastText.innerText = msg;
+        toast.classList.remove('opacity-0', 'translate-y-[-100px]', 'pointer-events-none');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-[-100px]', 'pointer-events-none');
+            toast.classList.remove('opacity-100', 'translate-y-0');
+        }, 2500);
+    }
+
+    function appendMessage(role, text) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `flex items-start space-x-2.5 ${role === 'user' ? 'justify-end' : ''}`;
+        
+        if (role === 'user') {
+            msgDiv.innerHTML = `
+                <div class="bg-brand-600 text-white p-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85%] text-xs sm:text-sm">
+                    <p class="whitespace-pre-wrap">${escapeHtml(text)}</p>
+                </div>
+            `;
+        } else {
+            const rawId = 'msg-' + Date.now();
+            msgDiv.innerHTML = `
+                <div class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                    AI
+                </div>
+                <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm max-w-[85%] text-xs sm:text-sm">
+                    <div id="${rawId}" class="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200">${marked.parse(text || '')}</div>
+                    <div class="mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+                        <span>${PERSONAS[state.persona].shortTag}</span>
+                        <button onclick="copyMsgText('${rawId}')" class="hover:text-slate-600 dark:hover:text-slate-200 flex items-center space-x-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <span>Copy</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        messagesContainer.appendChild(msgDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return msgDiv;
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function copyMsgText(elemId) {
+        const elem = document.getElementById(elemId);
+        if (!elem) return;
+        const text = elem.innerText;
+        const temp = document.createElement("textarea");
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+        showToast("Copied to clipboard!");
+    }
+
+    function clearChatHistory() {
+        state.history = [];
+        messagesContainer.innerHTML = '';
+        appendMessage('assistant', `Chat cleared. Current active persona: **${PERSONAS[state.persona].title}**.`);
+    }
+
+    function handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleChatSubmit(e);
+        }
+    }
+
+    async function handleChatSubmit(e) {
+        if (e) e.preventDefault();
+        const text = userInput.value.trim();
+        if (!text || state.isStreaming) return;
+
+        userInput.value = '';
+        appendMessage('user', text);
+        state.history.push({ role: 'user', content: text });
+
+        state.isStreaming = true;
+        sendBtn.disabled = true;
+
+        // Create empty assistant response container for streaming tokens
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'flex items-start space-x-2.5';
+        const rawId = 'msg-' + Date.now();
+        msgDiv.innerHTML = `
+            <div class="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                AI
+            </div>
+            <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-2xl rounded-tl-sm shadow-sm max-w-[85%] text-xs sm:text-sm">
+                <div id="${rawId}" class="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200">
+                    <span class="inline-block w-2 h-4 bg-brand-600 animate-pulse"></span>
+                </div>
+                <div class="mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>${PERSONAS[state.persona].shortTag}</span>
+                    <button onclick="copyMsgText('${rawId}')" class="hover:text-slate-600 dark:hover:text-slate-200 flex items-center space-x-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        <span>Copy</span>
+                    </button>
+                </div>
+            </div>
+        `;
+        messagesContainer.appendChild(msgDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        const contentBox = document.getElementById(rawId);
+
+        let accumulatedResponse = '';
+
+        try {
+            // Mode A: Offline Simulation mode (Zero key needed, instant gratification)
+            if (state.provider === 'simulation' || !state.apiKey) {
+                accumulatedResponse = await runSimulationResponse(text, contentBox);
+            } else {
+                // Mode B: Client-side OpenAI-compatible streaming (Groq or Custom host)
+                const endpoint = state.provider === 'groq' 
+                    ? 'https://api.groq.com/openai/v1/chat/completions' 
+                    : `${state.customUrl.replace(/\/+$/, '')}/chat/completions`;
+
+                const messagesPayload = [
+                    { role: 'system', content: PERSONAS[state.persona].systemPrompt },
+                    ...state.history
+                ];
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${state.apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: state.model,
+                        messages: messagesPayload,
+                        temperature: 0.3,
+                        max_tokens: 512,
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) {
+                    const errJson = await response.json().catch(() => ({}));
+                    throw new Error(errJson.error?.message || `HTTP ${response.status}: Failed to connect.`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                contentBox.innerHTML = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                            try {
+                                const parsed = JSON.parse(line.replace('data: ', ''));
+                                const token = parsed.choices?.[0]?.delta?.content || '';
+                                accumulatedResponse += token;
+                                contentBox.innerHTML = marked.parse(accumulatedResponse);
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            } catch (e) {
+                                // Partial stream frame
+                            }
+                        }
+                    }
+                }
+            }
+            
+            state.history.push({ role: 'assistant', content: accumulatedResponse });
+        } catch (error) {
+            contentBox.innerHTML = `<span class="text-rose-500 font-semibold">Error:</span> ${escapeHtml(error.message)}<br><span class="text-[11px] text-slate-400">Tip: Check API key in settings or switch to Simulation mode.</span>`;
+        } finally {
+            state.isStreaming = false;
+            sendBtn.disabled = false;
+        }
+    }
+
+    async function runSimulationResponse(userPrompt, contentBox) {
+        contentBox.innerHTML = '';
+        const simulatedReplies = {
+            support: `Thank you for reaching out! In this demo architecture, we deploy lightweight modular models completely serverless. You can connect this to **Groq's free API** in the settings tab to achieve sub-second live inferences for ₹0!`,
+            tech: `Here is how you can mount this zero-cost architecture:\n\n\`\`\`javascript\n// Fast SSE streaming on free client runtime\nconst res = await fetch('https://api.groq.com/openai/v1/chat/completions', {\n  headers: { 'Authorization': 'Bearer ' + API_KEY },\n  body: JSON.stringify({ model: 'llama-3.2-1b-preview', stream: true })\n});\n\`\`\`\nThis guarantees zero server idle fees.`,
+            sales: `Our modular chatbot framework allows companies to cut AI infrastructure spending down to zero by leveraging client-side edge routing and free tier models. Would you like to test our Technical persona or review pricing?`
+        };
+
+        const targetText = simulatedReplies[state.persona] || simulatedReplies.support;
+        let streamed = '';
+        const words = targetText.split(' ');
+
+        for (const word of words) {
+            streamed += (streamed ? ' ' : '') + word;
+            contentBox.innerHTML = marked.parse(streamed);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            await new Promise(r => setTimeout(r, 40));
+        }
+
+        return streamed;
+    }
+
+    function copyEmbedSnippet() {
+        const snippet = `<script src="https://your-domain-or-github-pages.github.io/chat-widget.js" defer><\/script>\n<div id="modular-chat-widget" data-persona="support" data-provider="groq"><\/div>`;
+        const temp = document.createElement("textarea");
+        temp.value = snippet;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+        showToast("Embed tag copied!");
+    }
+
+    // Initialize application on window load
+    window.onload = function() {
+        initTheme();
+        updateStatusLabel();
+    };
+</script>
+
+</body>
+</html>
